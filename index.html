@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#ffffff">
+  <title>DACAPO - Musician Organizer</title>
+  <link rel="icon" type="image/png" href="/icon-192x192.png">
+  <link rel="apple-touch-icon" href="/apple-icon-180x180.png">
+  <link rel="manifest" href="/manifest.json">
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/babel-standalone@7.24.7/babel.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    .smooth-transition { transition: all 0.3s ease; }
+    .input-focus:focus { border-color: #000; box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1); }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // Firebase Configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyBSrAMIeQc4B9lqg0az3FMWaccq96aAb8o",
+      authDomain: "dacapo-app-vf-4ab15.firebaseapp.com",
+      projectId: "dacapo-app-vf-4ab15",
+      storageBucket: "dacapo-app-vf-4ab15.firebasestorage.app",
+      messagingSenderId: "1020500840592",
+      appId: "1:1020500840592:web:ff1742b1d0c56e60a00815",
+      measurementId: "G-JLKXXSVQVM"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    // Landing Page Component
+    const LandingPage = ({ setPage }) => (
+      <div className="min-h-screen bg-white text-black flex flex-col items-center justify-center p-6">
+        <h1 className="text-4xl font-bold mb-4">Welcome to DACAPO</h1>
+        <p className="text-lg text-center mb-6">Your ultimate organizer for classical musicians. Manage concerts, gear, and repertoire with ease.</p>
+        <div className="w-full max-w-md">
+          <h2 className="text-xl font-semibold mb-2">Install DACAPO</h2>
+          <p className="mb-4">Add DACAPO to your home screen for a seamless experience:</p>
+          <div className="mb-6">
+            <h3 className="font-medium">iOS:</h3>
+            <p>1. Open Safari and navigate to this page.</p>
+            <p>2. Tap the Share icon.</p>
+            <p>3. Select "Add to Home Screen".</p>
+          </div>
+          <div className="mb-6">
+            <h3 className="font-medium">Android:</h3>
+            <p>1. Open Chrome and navigate to this page.</p>
+            <p>2. Tap the Menu (three dots).</p>
+            <p>3. Select "Add to Home screen".</p>
+          </div>
+          <button
+            onClick={() => setPage('login')}
+            className="w-full bg-black text-white py-3 rounded-lg smooth-transition hover:bg-gray-800"
+          >
+            Get Started
+          </button>
+        </div>
+      </div>
+    );
+
+    // Login/Signup Component
+    const AuthPage = ({ setPage, setUser }) => {
+      const [isLogin, setIsLogin] = useState(true);
+      const [email, setEmail] = useState('');
+      const [password, setPassword] = useState('');
+      const [error, setError] = useState('');
+
+      const handleAuth = async () => {
+        try {
+          if (isLogin) {
+            const userCredential = await auth.signInWithEmailAndPassword(email, password);
+            setUser(userCredential.user);
+            setPage('dashboard');
+          } else {
+            const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+            setUser(userCredential.user);
+            setPage('dashboard');
+          }
+        } catch (err) {
+          setError(err.message);
+        }
+      };
+
+      return (
+        <div className="min-h-screen bg-white text-black flex flex-col items-center justify-center p-6">
+          <h1 className="text-3xl font-bold mb-6">{isLogin ? 'Login' : 'Sign Up'}</h1>
+          <div className="w-full max-w-md">
+            <input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full p-3 mb-4 border border-gray-300 rounded-lg input-focus"
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full p-3 mb-4 border border-gray-300 rounded-lg input-focus"
+            />
+            {error && <p className="text-red-500 mb-4">{error}</p>}
+            <button
+              onClick={handleAuth}
+              className="w-full bg-black text-white py-3 rounded-lg smooth-transition hover:bg-gray-800"
+            >
+              {isLogin ? 'Login' : 'Sign Up'}
+            </button>
+            <p className="mt-4 text-center">
+              {isLogin ? "Don't have an account?" : 'Already have an account?'}
+              <button
+                onClick={() => setIsLogin(!isLogin)}
+                className="ml-1 text-blue-600 hover:underline"
+              >
+                {isLogin ? 'Sign Up' : 'Login'}
+              </button>
+            </p>
+          </div>
+        </div>
+      );
+    };
+
+    // Dashboard Component
+    const Dashboard = ({ user, setPage }) => {
+      const [activeTab, setActiveTab] = useState('agenda');
+      const [concerts, setConcerts] = useState([]);
+      const [gear, setGear] = useState([]);
+      const [repertoire, setRepertoire] = useState([]);
+      const [newConcert, setNewConcert] = useState({ date: '', title: '', location: '' });
+      const [newGear, setNewGear] = useState({ item: '', purchased: false });
+      const [newPiece, setNewPiece] = useState({ title: '', composer: '' });
+
+      useEffect(() => {
+        // Fetch concerts
+        const unsubscribeConcerts = db.collection('users').doc(user.uid).collection('concerts')
+          .onSnapshot((snapshot) => {
+            setConcerts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+          });
+        // Fetch gear
+        const unsubscribeGear = db.collection('users').doc(user.uid).collection('gear')
+          .onSnapshot((snapshot) => {
+            setGear(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+          });
+        // Fetch repertoire
+        const unsubscribeRepertoire = db.collection('users').doc(user.uid).collection('repertoire')
+          .onSnapshot((snapshot) => {
+            setRepertoire(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+          });
+        return () => {
+          unsubscribeConcerts();
+          unsubscribeGear();
+          unsubscribeRepertoire();
+        };
+      }, [user]);
+
+      const addConcert = async () => {
+        if (newConcert.date && newConcert.title) {
+          await db.collection('users').doc(user.uid).collection('concerts').add(newConcert);
+          setNewConcert({ date: '', title: '', location: '' });
+        }
+      };
+
+      const addGear = async () => {
+        if (newGear.item) {
+          await db.collection('users').doc(user.uid).collection('gear').add(newGear);
+          setNewGear({ item: '', purchased: false });
+        }
+      };
+
+      const addPiece = async () => {
+        if (newPiece.title && newPiece.composer) {
+          await db.collection('users').doc(user.uid).collection('repertoire').add(newPiece);
+          setNewPiece({ title: '', composer: '' });
+        }
+      };
+
+      const toggleGearPurchased = async (id, purchased) => {
+        await db.collection('users').doc(user.uid).collection('gear').doc(id).update({ purchased: !purchased });
+      };
+
+      return (
+        <div className="min-h-screen bg-white text-black p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-2xl font-bold">DACAPO</h1>
+            <button
+              onClick={() => auth.signOut().then(() => setPage('landing'))}
+              className="text-blue-600 hover:underline"
+            >
+              Logout
+            </button>
+          </div>
+          <div className="flex border-b mb-4">
+            <button
+              onClick={() => setActiveTab('agenda')}
+              className={`flex-1 py-2 ${activeTab === 'agenda' ? 'border-b-2 border-black' : ''}`}
+            >
+              Agenda
+            </button>
+            <button
+              onClick={() => setActiveTab('gear')}
+              className={`flex-1 py-2 ${activeTab === 'gear' ? 'border-b-2 border-black' : ''}`}
+            >
+              Gear
+            </button>
+            <button
+              onClick={() => setActiveTab('repertoire')}
+              className={`flex-1 py-2 ${activeTab === 'repertoire' ? 'border-b-2 border-black' : ''}`}
+            >
+              Repertoire
+            </button>
+          </div>
+
+          {activeTab === 'agenda' && (
+            <div>
+              <h2 className="text-xl font-semibold mb-4">Concert Agenda</h2>
+              <div className="mb-4">
+                <input
+                  type="date"
+                  value={newConcert.date}
+                  onChange={(e) => setNewConcert({ ...newConcert, date: e.target.value })}
+                  className="p-2 border border-gray-300 rounded-lg mb-2 w-full input-focus"
+                />
+                <input
+                  type="text"
+                  placeholder="Concert Title"
+                  value={newConcert.title}
+                  onChange={(e) => setNewConcert({ ...newConcert, title: e.target.value })}
+                  className="p-2 border border-gray-300 rounded-lg mb-2 w-full input-focus"
+                />
+                <input
+                  type="text"
+                  placeholder="Location"
+                  value={newConcert.location}
+                  onChange={(e) => setNewConcert({ ...newConcert, location: e.target.value })}
+                  className="p-2 border border-gray-300 rounded-lg mb-2 w-full input-focus"
+                />
+                <button
+                  onClick={addConcert}
+                  className="w-full bg-black text-white py-2 rounded-lg smooth-transition hover:bg-gray-800"
+                >
+                  Add Concert
+                </button>
+              </div>
+              <ul>
+                {concerts.map(concert => (
+                  <li key={concert.id} className="p-3 border-b border-gray-200">
+                    <p className="font-medium">{concert.title}</p>
+                    <p>{concert.date} - {concert.location}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {activeTab === 'gear' && (
+            <div>
+              <h2 className="text-xl font-semibold mb-4">Gear Shopping List</h2>
+              <div className="mb-4">
+                <input
+                  type="text"
+                  placeholder="Gear Item"
+                  value={newGear.item}
+                  onChange={(e) => setNewGear({ ...newGear, item: e.target.value })}
+                  className="p-2 border border-gray-300 rounded-lg mb-2 w-full input-focus"
+                />
+                <button
+                  onClick={addGear}
+                  className="w-full bg-black text-white py-2 rounded-lg smooth-transition hover:bg-gray-800"
+                >
+                  Add Gear
+                </button>
+              </div>
+              <ul>
+                {gear.map(item => (
+                  <li key={item.id} className="flex items-center p-3 border-b border-gray-200">
+                    <input
+                      type="checkbox"
+                      checked={item.purchased}
+                      onChange={() => toggleGearPurchased(item.id, item.purchased)}
+                      className="mr-2"
+                    />
+                    <p className={item.purchased ? 'line-through text-gray-500' : ''}>{item.item}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {activeTab === 'repertoire' && (
+            <div>
+              <h2 className="text-xl font-semibold mb-4">Music Repertoire</h2>
+              <div className="mb-4">
+                <input
+                  type="text"
+                  placeholder="Piece Title"
+                  value={newPiece.title}
+                  onChange={(e) => setNewPiece({ ...newPiece, title: e.target.value })}
+                  className="p-2 border border-gray-300 rounded-lg mb-2 w-full input-focus"
+                />
+                <input
+                  type="text"
+                  placeholder="Composer"
+                  value={newPiece.composer}
+                  onChange={(e) => setNewPiece({ ...newPiece, composer: e.target.value })}
+                  className="p-2 border border-gray-300 rounded-lg mb-2 w-full input-focus"
+                />
+                <button
+                  onClick={addPiece}
+                  className="w-full bg-black text-white py-2 rounded-lg smooth-transition hover:bg-gray-800"
+                >
+                  Add Piece
+                </button>
+              </div>
+              <ul>
+                {repertoire.map(piece => (
+                  <li key={piece.id} className="p-3 border-b border-gray-200">
+                    <p className="font-medium">{piece.title}</p>
+                    <p>{piece.composer}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    // Main App Component
+    const App = () => {
+      const [page, setPage] = useState('landing');
+      const [user, setUser] = useState(null);
+
+      useEffect(() => {
+        const unsubscribe = auth.onAuthStateChanged(user => {
+          if (user) {
+            setUser(user);
+            setPage('dashboard');
+          } else {
+            setUser(null);
+            setPage('landing');
+          }
+        });
+        return unsubscribe;
+      }, []);
+
+      return (
+        <div>
+          {page === 'landing' && <LandingPage setPage={setPage} />}
+          {page === 'login' && <AuthPage setPage={setPage} setUser={setUser} />}
+          {page === 'dashboard' && <Dashboard user={user} setPage={setPage} />}
+        </div>
+      );
+    };
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+
+    // Service Worker Registration
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js');
+      });
+    }
+  </script>
+</body>
+</html>
